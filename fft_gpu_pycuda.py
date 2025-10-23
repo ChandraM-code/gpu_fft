@@ -15,8 +15,10 @@ debug = True
 
 # CUDA kernel for bit-reversal permutation
 bit_reverse_kernel_code = """
-__global__ void bit_reverse_kernel(pycuda::complex<double>* input_a, 
-                                   pycuda::complex<double>* output_a, 
+#include <cuComplex.h>
+
+__global__ void bit_reverse_kernel(cuDoubleComplex* input_a, 
+                                   cuDoubleComplex* output_a, 
                                    int n, int n_bits)
 {
     // get thread index
@@ -41,9 +43,9 @@ __global__ void bit_reverse_kernel(pycuda::complex<double>* input_a,
 
 # CUDA kernel for FFT stage computation
 fft_stage_kernel_code = """
-#include <math.h>
+#include <cuComplex.h>
 
-__global__ void fft_stage_kernel(pycuda::complex<double>* in_a, int n, int stage)
+__global__ void fft_stage_kernel(cuDoubleComplex* in_a, int n, int stage)
 {
     // get thread index
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
@@ -74,10 +76,10 @@ __global__ void fft_stage_kernel(pycuda::complex<double>* in_a, int n, int stage
             int idx2 = k + j + half_m;
             
             // read values
-            double u_real = in_a[idx1].real();
-            double u_imag = in_a[idx1].imag();
-            double v_real = in_a[idx2].real();
-            double v_imag = in_a[idx2].imag();
+            double u_real = cuCreal(in_a[idx1]);
+            double u_imag = cuCimag(in_a[idx1]);
+            double v_real = cuCreal(in_a[idx2]);
+            double v_imag = cuCimag(in_a[idx2]);
             
             // complex multiplication: t = w * v
             double t_real = w_real * v_real - w_imag * v_imag;
@@ -86,8 +88,8 @@ __global__ void fft_stage_kernel(pycuda::complex<double>* in_a, int n, int stage
             // Butterfly:
             // data[idx1] = u + t
             // data[idx2] = u - t
-            in_a[idx1] = pycuda::complex<double>(u_real + t_real, u_imag + t_imag);
-            in_a[idx2] = pycuda::complex<double>(u_real - t_real, u_imag - t_imag);
+            in_a[idx1] = make_cuDoubleComplex(u_real + t_real, u_imag + t_imag);
+            in_a[idx2] = make_cuDoubleComplex(u_real - t_real, u_imag - t_imag);
         }
     }
 }
